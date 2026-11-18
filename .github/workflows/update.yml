@@ -18,8 +18,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Ставим ffmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Ставим ffmpeg (статический бинарник)
+        run: |
+          curl -L --retry 3 -o ./ffmpeg https://github.com/eugeneware/ffmpeg-static/releases/download/b6.0/linux-x64
+          chmod +x ./ffmpeg
+          echo "$PWD" >> $GITHUB_PATH
 
       - name: Обновляем index.html со свежими превью
         env:
