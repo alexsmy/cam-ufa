@@ -1,14 +1,11 @@
-"""Обновление index.html со встроенными превью — 4 потока.
+"""Обновление index.html со встроенными превью — 1 поток (надёжно).
 
-На GitHub 7 ГБ RAM, поэтому 4 параллельных воркера безопасно (~200 МБ пик).
-Каждый ffmpeg всё равно в 1 поток. Временные файлы уникальны на камеру.
+Последовательно, один ffmpeg, потоковая загрузка с лимитом. Память ~40-60 МБ.
 """
 import os, re, subprocess, time, gc, base64, urllib.request, urllib.error, tempfile, shutil
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 MAX_MP4 = 2 * 1024 * 1024
 UA = 'Mozilla/5.0'
-WORKERS = 4
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -50,8 +47,8 @@ def jpeg_for(cid, tmpdir):
     host, token = get_token_and_host(cid)
     if not host or not token:
         return None
-    mp4 = os.path.join(tmpdir, f'_cam_{cid}.mp4')
-    jpg = os.path.join(tmpdir, f'_cam_{cid}.jpg')
+    mp4 = os.path.join(tmpdir, '_cam.mp4')
+    jpg = os.path.join(tmpdir, f'{cid}.jpg')
     url = f'https://{host}/{cid}/preview.mp4?token={token}'
     try:
         if not download_limited(url, mp4):
@@ -78,14 +75,12 @@ if __name__ == '__main__':
     result = {}
     try:
         ids = [l.strip() for l in open('ids.json') if l.strip()]
-        with ThreadPoolExecutor(max_workers=WORKERS) as ex:
-            futs = {ex.submit(jpeg_for, cid, tmpdir): cid for cid in ids}
-            for i, f in enumerate(as_completed(futs), 1):
-                cid = futs[f]
-                result[cid] = f.result()
-                if i % 10 == 0:
-                    print(f'{i}/{len(ids)}', flush=True)
-                    gc.collect()
+        for i, cid in enumerate(ids, 1):
+            result[cid] = jpeg_for(cid, tmpdir)
+            if i % 10 == 0:
+                print(f'{i}/{len(ids)}', flush=True)
+                gc.collect()
+            time.sleep(0.05)
 
         template = open('index.template.html').read()
 
