@@ -21,11 +21,18 @@ def get_token_and_host(cid):
         return None, None
     except urllib.error.HTTPError as e:
         loc = e.headers.get('Location', '')
-    except Exception:
+        if os.environ.get('DEBUG'):
+            print('DBG', cid, 'HTTP', e.code, 'Location?', bool(loc), flush=True)
+    except Exception as ex:
+        if os.environ.get('DEBUG'):
+            print('DBG', cid, 'EXC', repr(ex)[:120], flush=True)
         return None, None
     h = re.match(r'https?://([^/]+)', loc or '')
     t = re.search(r'[?&]token=([^&]+)', loc or '')
-    return (h.group(1) if h else None), (t.group(1) if t else None)
+    host, token = (h.group(1) if h else None), (t.group(1) if t else None)
+    if os.environ.get('DEBUG'):
+        print('DBG token', cid, bool(host), bool(token), flush=True)
+    return host, token
 
 
 def download_limited(url, path):
@@ -52,7 +59,11 @@ def jpeg_for(cid, tmpdir):
     url = f'https://{host}/{cid}/preview.mp4?token={token}'
     try:
         if not download_limited(url, mp4):
+            if os.environ.get('DEBUG'):
+                print('DBG download FAIL', cid, os.path.getsize(mp4) if os.path.exists(mp4) else 0, flush=True)
             return None
+        if os.environ.get('DEBUG'):
+            print('DBG mp4', cid, os.path.getsize(mp4), flush=True)
         subprocess.run([
             'ffmpeg', '-y', '-nostdin', '-loglevel', 'error',
             '-threads', '1', '-filter_threads', '1',
