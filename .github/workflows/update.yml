@@ -20,6 +20,8 @@ jobs:
 
       - name: Обновляем index.html со свежими превью
         run: python refresh.py
+        env:
+          DEBUG: '1'
 
       - name: Коммитим результат (Pages сам обновится)
         run: |
