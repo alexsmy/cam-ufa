@@ -18,12 +18,13 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Ставим ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
       - name: Обновляем index.html со свежими превью
         env:
           DEBUG: '1'
-        run: |
-          which ffmpeg || echo NO_FFMPEG
-          python refresh.py
+        run: python refresh.py
 
       - name: Коммитим результат (Pages сам обновится)
         run: |
