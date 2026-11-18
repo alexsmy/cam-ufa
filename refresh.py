@@ -64,16 +64,21 @@ def jpeg_for(cid, tmpdir):
             return None
         if os.environ.get('DEBUG'):
             print('DBG mp4', cid, os.path.getsize(mp4), flush=True)
-        subprocess.run([
+        r = subprocess.run([
             'ffmpeg', '-y', '-nostdin', '-loglevel', 'error',
             '-threads', '1', '-filter_threads', '1',
             '-i', mp4, '-frames:v', '1', '-vf', 'scale=320:-2',
             '-q:v', '5', jpg
         ], capture_output=True, timeout=30)
+        if os.environ.get('DEBUG'):
+            print('DBG ffmpeg', cid, 'rc', r.returncode, 'jpg',
+                  os.path.getsize(jpg) if os.path.exists(jpg) else 0,
+                  r.stderr.decode()[:150], flush=True)
         if os.path.exists(jpg) and os.path.getsize(jpg) > 1000:
             return open(jpg, 'rb').read()
-    except Exception:
-        pass
+    except Exception as ex:
+        if os.environ.get('DEBUG'):
+            print('DBG EXC', cid, repr(ex)[:150], flush=True)
     finally:
         for p in (mp4, jpg):
             if os.path.exists(p):
