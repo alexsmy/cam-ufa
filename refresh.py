@@ -6,6 +6,11 @@ import os, re, subprocess, time, gc, base64, urllib.request, urllib.error, tempf
 
 MAX_MP4 = 2 * 1024 * 1024
 UA = 'Mozilla/5.0'
+try:
+    import imageio_ffmpeg
+    FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
+    FFMPEG = 'ffmpeg'
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -65,7 +70,7 @@ def jpeg_for(cid, tmpdir):
         if os.environ.get('DEBUG'):
             print('DBG mp4', cid, os.path.getsize(mp4), flush=True)
         r = subprocess.run([
-            'ffmpeg', '-y', '-nostdin', '-loglevel', 'error',
+            FFMPEG, '-y', '-nostdin', '-loglevel', 'error',
             '-threads', '1', '-filter_threads', '1',
             '-i', mp4, '-frames:v', '1', '-vf', 'scale=320:-2',
             '-q:v', '5', jpg
