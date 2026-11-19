@@ -1,0 +1,5 @@
+previews/
+_site/
+__pycache__/
+.venv/
+README.local.md
