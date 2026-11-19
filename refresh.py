@@ -192,7 +192,7 @@ def render(cams, ok, ext, now):
         if jk != cur:
             flush()
             cur, buf = jk, []
-        stream = f'https://ucams.ufanet.ru/api/internal/embed/{cid}/?ttl=3600&autoplay=true&mute=true'
+        stream = f'watch.html?id={cid}'
         src = f'previews/{cid}.{ext}?v={slot}'
         alt = html.escape(f'{jk}, {title}')
         search = html.escape(f'{jk} {title} {cid}'.lower(), quote=True)

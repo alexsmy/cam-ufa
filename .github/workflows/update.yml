@@ -38,7 +38,7 @@ jobs:
       - name: Готовим сайт к публикации
         run: |
           mkdir -p _site
-          cp index.html icon.svg og.png _site/
+          cp index.html icon.svg og.png watch.html _site/
           cp -r previews _site/
           cp -r archive _site/
 
