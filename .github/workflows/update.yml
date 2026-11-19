@@ -42,6 +42,18 @@ jobs:
           cp -r previews _site/
           cp -r archive _site/
 
+      - name: Отчёт в лог
+        run: |
+          echo "Запуск (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')  событие: $GITHUB_EVENT_NAME"
+          echo "Превью на сайте: $(ls previews | wc -l)"
+          python - <<'PY'
+          import json
+          m = json.load(open('archive/index.json', encoding='utf-8'))
+          total = sum(len(v) for v in m.values())
+          sample = next((v for v in m.values() if v), [])
+          print(f'Кадров в архиве: {total}; у камеры {len(sample)}: {", ".join(sample[-3:])}')
+          PY
+
       # GitHub отключает расписание, если в репозитории 60 дней нет активности.
       # Раз в неделю обновляем маленький файл, чтобы расписание не остановилось.
       - name: Поддерживаем расписание активным
