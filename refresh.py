@@ -2,7 +2,7 @@
 
 Последовательно, один ffmpeg, потоковая загрузка с лимитом. Память ~40-60 МБ.
 """
-import os, re, subprocess, time, gc, base64, urllib.request, urllib.error, tempfile, shutil
+import os, re, subprocess, time, gc, base64, urllib.request, urllib.error, tempfile, shutil, datetime
 
 MAX_MP4 = 2 * 1024 * 1024
 UA = 'Mozilla/5.0'
@@ -111,6 +111,8 @@ if __name__ == '__main__':
                 'src="data:image/jpeg;base64,' + base64.b64encode(data).decode() + '"'
 
         html, n = re.subn(r'src="previews_jpg/([A-Za-z0-9_-]+)\.jpg"', repl, template)
+        stamp = datetime.datetime.now().strftime('%d.%m.%Y %H:%M')
+        html = re.sub(r'собрано \d{2}\.\d{2}\.\d{4} \d{2}:\d{2}', 'собрано ' + stamp, html)
         open('index.html', 'w').write(html)
         print(f'OK {sum(1 for v in result.values() if v)}/{len(ids)}; embedded {n}; html {len(html)//1024} KB')
     finally:
