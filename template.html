@@ -246,6 +246,7 @@ body.locked{overflow:hidden}
     try { last = +sessionStorage.getItem('camufa-reload') || 0; } catch(e){}
     if (age > 35 * 60000 && Date.now() - last > 10 * 60000) {
       try { sessionStorage.setItem('camufa-reload', String(Date.now())); } catch(e){}
+      try { sessionStorage.setItem('camufa-return', '1'); } catch(e){}
       location.reload();
     }
   }
@@ -266,14 +267,22 @@ body.locked{overflow:hidden}
   window.addEventListener('beforeunload', saveY);
 
   function restoreY(){
-    var raw = '', y = 0, ts = 0;
-    try { raw = sessionStorage.getItem('camufa-y') || ''; } catch(e){}
+    var raw = '', y = 0, ts = 0, flag = false;
+    try {
+      raw = sessionStorage.getItem('camufa-y') || '';
+      flag = sessionStorage.getItem('camufa-return') === '1';
+    } catch(e){}
     var parts = raw.split('|');
     y = +parts[0] || 0;
     ts = +parts[1] || 0;
-    // возвращаем место только если уходили недавно (камера, авто-обновление)
-    if (y <= 0 || !ts || Date.now() - ts > 15 * 60000) return;
-    try { sessionStorage.removeItem('camufa-y'); } catch(e){}
+    // флаг ставит камера перед возвратом и авто-обновление;
+    // свежая отметка подстраховывает ручную перезагрузку
+    var recent = ts > 0 && Date.now() - ts < 2 * 60000;
+    if (y <= 0 || (!flag && !recent)) return;
+    try {
+      sessionStorage.removeItem('camufa-y');
+      sessionStorage.removeItem('camufa-return');
+    } catch(e){}
     var smooth = document.documentElement.style.scrollBehavior;
     document.documentElement.style.scrollBehavior = 'auto';
     window.scrollTo(0, y);

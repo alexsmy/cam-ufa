@@ -61,9 +61,15 @@ body{display:flex;flex-direction:column;color:#e6edf3;
     document.title = name + ' — камера';
   }
 
-  // Возвращаемся в тот же список и на то же место. Список сам восстановит
-  // прокрутку (см. index.html), поэтому здесь достаточно вернуться назад.
+  // Метка «мы уходили на камеру» — список по ней восстановит прокрутку.
+  // pagehide ловит и кнопку «назад», и системный жест «назад».
+  function markReturn(){ try { sessionStorage.setItem('camufa-return', '1'); } catch(e){} }
+  window.addEventListener('pagehide', markReturn);
+  window.addEventListener('beforeunload', markReturn);
+
+  // Возвращаемся в тот же список и на то же место.
   document.getElementById('close').addEventListener('click', function(){
+    markReturn();
     var same = false;
     try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch(e){}
     if (same && history.length > 1) history.back();
