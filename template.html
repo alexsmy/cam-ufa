@@ -99,11 +99,12 @@ body.locked{overflow:hidden}
 #top.show{opacity:1;pointer-events:auto}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 /* ---------- телефон: 1 или 2 камеры в ряд ---------- */
-.seg{display:none;border:1px solid var(--line);border-radius:999px;overflow:hidden}
-.seg button{border:0;border-radius:0;padding:6px 10px;font-size:13px;background:var(--card);color:var(--mut)}
-.seg button[aria-pressed=true]{background:var(--chip-a);color:var(--acc);font-weight:600}
+#cols{display:none;width:34px;height:34px;padding:0;border-radius:50%;font-size:13px;font-weight:600;line-height:1}
 @media(max-width:559px){
-  .seg{display:flex}
+  #cols{display:inline-block}
+  #fav .lbl{display:none}
+  #fav{padding:8px 10px}
+  input[type=search]{min-width:80px}
   html.one .cams{grid-template-columns:1fr}
   .jk{padding:8px}
   .cap{padding:6px 8px;gap:4px}
@@ -122,12 +123,9 @@ body.locked{overflow:hidden}
     </div>
     <div class="tools">
       <input id="q" type="search" placeholder="Поиск по ЖК…" autocomplete="off" aria-label="Поиск по ЖК">
-      <button id="fav" type="button" aria-pressed="false">★ Избранное</button>
+      <button id="fav" type="button" aria-pressed="false">★<span class="lbl"> Избранное</span></button>
       <button id="reload" type="button" title="Перезагрузить страницу" aria-label="Перезагрузить">⟳</button>
-      <div class="seg" id="cols" role="group" aria-label="Камер в строке">
-        <button type="button" data-n="1" aria-pressed="false">1</button>
-        <button type="button" data-n="2" aria-pressed="true">2</button>
-      </div>
+      <button id="cols" type="button" title="Камер в ряд" aria-label="Камер в ряд: 2">2</button>
     </div>
   </div>
 </header>
@@ -212,17 +210,16 @@ body.locked{overflow:hidden}
 
   document.getElementById('reload').addEventListener('click', function(){ location.reload(); });
 
-  // 1 или 2 камеры в ряд на телефоне
-  var colsBtns = [].slice.call(document.querySelectorAll('#cols button'));
+  // 1 или 2 камеры в ряд на телефоне (кнопка показывает текущий режим)
+  var colsBtn = document.getElementById('cols');
   function setCols(n){
     document.documentElement.classList.toggle('one', n === '1');
+    colsBtn.textContent = n;
+    colsBtn.setAttribute('aria-label', 'Камер в ряд: ' + n + '. Нажмите, чтобы переключить');
     try { localStorage.setItem('camufa-cols', n); } catch(e){}
-    colsBtns.forEach(function(b){
-      b.setAttribute('aria-pressed', b.dataset.n === n ? 'true' : 'false');
-    });
   }
-  colsBtns.forEach(function(b){
-    b.addEventListener('click', function(){ setCols(b.dataset.n); });
+  colsBtn.addEventListener('click', function(){
+    setCols(colsBtn.textContent === '1' ? '2' : '1');
   });
   try { setCols(localStorage.getItem('camufa-cols') === '1' ? '1' : '2'); } catch(e){ setCols('2'); }
 
