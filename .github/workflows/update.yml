@@ -33,6 +33,35 @@ jobs:
           python-version: '3.11'
           cache: pip
 
+      # Папка archive/ не хранится в git (она большая). Чтобы таймлапс за сутки
+      # действительно накапливался, забираем предыдущую публикацию сайта и
+      # переносим из неё архив кадров в текущую сборку.
+      - name: Восстанавливаем архив кадров
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=github-pages&per_page=1" \
+                --jq '.artifacts[0].id // empty')
+          if [ -z "$id" ]; then
+            echo "Прошлой публикации нет — архив начнётся с этого запуска"
+            exit 0
+          fi
+          if ! curl -sSL --fail --retry 3 \
+               -H "Authorization: Bearer $GH_TOKEN" \
+               -H "Accept: application/vnd.github+json" \
+               "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" \
+               -o /tmp/pages.zip; then
+            echo "::warning::Не удалось скачать прошлую публикацию — архив начнётся заново"
+            exit 0
+          fi
+          rm -rf /tmp/prev && mkdir -p /tmp/prev
+          unzip -q /tmp/pages.zip -d /tmp/prev
+          if [ -d /tmp/prev/archive ]; then
+            rm -rf ./archive
+            cp -r /tmp/prev/archive ./archive
+            echo "Кадров восстановлено: $(find archive -name '*.webp' | wc -l)"
+          fi
+
       - name: Ставим ffmpeg через pip
         run: python -m pip install -q -r requirements.txt
 
