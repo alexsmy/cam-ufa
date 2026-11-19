@@ -175,7 +175,7 @@ def build_archive(cams, ok, ext, now):
 
 def render(cams, ok, ext, now):
     stamp = now.strftime('%d.%m.%Y %H:%M')
-    hour = now.strftime('%Y%m%d%H')
+    slot = now.strftime('%Y%m%d') + ('00' if now.minute < 30 else '30')
     sections, cur, buf = [], None, []
 
     def flush():
@@ -193,7 +193,7 @@ def render(cams, ok, ext, now):
             flush()
             cur, buf = jk, []
         stream = f'https://ucams.ufanet.ru/api/internal/embed/{cid}/?ttl=3600&autoplay=true&mute=true'
-        src = f'previews/{cid}.{ext}?v={hour}'
+        src = f'previews/{cid}.{ext}?v={slot}'
         alt = html.escape(f'{jk}, {title}')
         search = html.escape(f'{jk} {title} {cid}'.lower(), quote=True)
         has_img = os.path.exists(os.path.join('previews', cid + '.' + ext))
@@ -229,7 +229,7 @@ def render(cams, ok, ext, now):
                .replace('{{COUNT}}', str(len(cams)))
                .replace('{{ONLINE}}', str(sum(1 for v in ok.values() if v)))
                .replace('{{STAMP}}', stamp)
-               .replace('{{ARCH_V}}', hour)
+               .replace('{{ARCH_V}}', slot)
                .replace('{{BUILT_MS}}', str(built)))
     with open('index.html', 'w', encoding='utf-8') as f:
         f.write(page)

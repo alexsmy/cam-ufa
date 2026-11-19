@@ -6,7 +6,7 @@ on:
   workflow_dispatch:          # можно запустить вручную
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -36,9 +36,23 @@ jobs:
       - name: Готовим сайт к публикации
         run: |
           mkdir -p _site
-          cp index.html _site/
+          cp index.html icon.svg og.png _site/
           cp -r previews _site/
           cp -r archive _site/
+
+      # GitHub отключает расписание, если в репозитории 60 дней нет активности.
+      # Раз в неделю обновляем маленький файл, чтобы расписание не остановилось.
+      - name: Поддерживаем расписание активным
+        if: github.ref == 'refs/heads/main'
+        run: |
+          if [ ! -f last-run.txt ] || [ $(( ($(date +%s) - $(date -r last-run.txt +%s)) / 86400 )) -ge 7 ]; then
+            date -u +%F > last-run.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add last-run.txt
+            git commit -m "keepalive $(date -u +%F)"
+            git push
+          fi
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

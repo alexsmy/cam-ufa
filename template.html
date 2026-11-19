@@ -8,6 +8,17 @@
 <meta name="theme-color" content="#0a58ca" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0f1419" media="(prefers-color-scheme: dark)">
 <title>Камеры строек Уфы</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="description" content="Камеры строек и ЖК Уфы: превью обновляются каждые 30 минут, таймлапс за сутки.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Камеры строек Уфы">
+<meta property="og:title" content="Камеры строек Уфы">
+<meta property="og:description" content="72 камеры строек и ЖК Уфы. Превью обновляются каждые 30 минут, таймлапс за сутки.">
+<meta property="og:url" content="https://alexsmy.github.io/cam-ufa/">
+<meta property="og:image" content="https://alexsmy.github.io/cam-ufa/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <style>
 :root{
   --bg:#eef2f7;--card:#fff;--tx:#1c2733;--mut:#6b7785;--acc:#0a58ca;
@@ -199,7 +210,7 @@ body.locked{overflow:hidden}
       'обновлено ' + (m < 60 ? m + ' мин назад' : Math.floor(m/60) + ' ч назад'));
     var last = 0;
     try { last = +sessionStorage.getItem('camufa-reload') || 0; } catch(e){}
-    if (age > 65 * 60000 && Date.now() - last > 10 * 60000) {
+    if (age > 35 * 60000 && Date.now() - last > 10 * 60000) {
       try { sessionStorage.setItem('camufa-reload', String(Date.now())); } catch(e){}
       location.reload();
     }
