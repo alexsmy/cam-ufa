@@ -80,7 +80,7 @@ jobs:
       - name: Готовим сайт к публикации
         run: |
           mkdir -p _site
-          cp index.html icon.svg og.png watch.html gifenc.esm.js _site/
+          cp index.html icon.svg og.png watch.html _site/
           cp -r previews _site/
           cp -r archive _site/
 
@@ -88,6 +88,7 @@ jobs:
         run: |
           echo "Запуск (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')  событие: $GITHUB_EVENT_NAME"
           echo "Превью на сайте: $(ls previews | wc -l)"
+          echo "MP4 таймлапсов: $(find archive -name 'timelapse.mp4' | wc -l)"
           python - <<'PY'
           import json
           m = json.load(open('archive/index.json', encoding='utf-8'))

@@ -171,7 +171,52 @@ def build_archive(cams, ok, ext, now):
 
     with open(os.path.join(ARCHIVE, 'index.json'), 'w', encoding='utf-8') as f:
         json.dump(manifest, f, ensure_ascii=False, separators=(',', ':'))
-    return sum(len(v) for v in manifest.values())
+    return manifest
+
+
+def build_timelapse_videos(manifest):
+    """Собирает из кадров короткий MP4 (H.264) для каждой камеры."""
+    tmpdir = tempfile.mkdtemp(prefix='tl_')
+    made, made_ids = 0, []
+    try:
+        for cid, frames in manifest.items():
+            folder = os.path.join(ARCHIVE, cid)
+            out = os.path.join(folder, 'timelapse.mp4')
+            if len(frames) < 2:
+                if os.path.exists(out):
+                    os.remove(out)
+                continue
+            files = [os.path.join(folder, n) for n in frames]
+            lst = os.path.join(tmpdir, cid + '.txt')
+            with open(lst, 'w', encoding='utf-8') as f:
+                # последний кадр дублируем, иначе concat может его «съесть»
+                for p in files + [files[-1]]:
+                    f.write("file '%s'\nduration 0.2\n" % os.path.abspath(p))
+            tmp_out = os.path.join(tmpdir, cid + '.mp4')
+            base = [
+                FFMPEG, '-y', '-nostdin', '-loglevel', 'error',
+                '-threads', '1', '-filter_threads', '1',
+                '-f', 'concat', '-safe', '0', '-i', lst,
+                '-vf', 'scale=480:-2,format=yuv420p', '-r', '5', '-an',
+            ]
+            tail = ['-crf', '26', '-pix_fmt', 'yuv420p',
+                    '-movflags', '+faststart', tmp_out]
+            r = subprocess.run(base + ['-c:v', 'libx264', '-preset', 'veryfast'] + tail,
+                               capture_output=True, timeout=180)
+            if r.returncode != 0 or not os.path.exists(tmp_out):
+                r = subprocess.run(base + ['-c:v', 'mpeg4', '-q:v', '5'] + tail,
+                                   capture_output=True, timeout=180)
+            if r.returncode == 0 and os.path.exists(tmp_out) and os.path.getsize(tmp_out) > 1000:
+                shutil.move(tmp_out, out)
+                made += 1
+                made_ids.append(cid)
+            if os.path.exists(tmp_out):
+                os.remove(tmp_out)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    with open(os.path.join(ARCHIVE, 'videos.json'), 'w', encoding='utf-8') as f:
+        json.dump(made_ids, f, separators=(',', ':'))
+    return made
 
 
 def render(cams, ok, ext, now):
@@ -278,9 +323,12 @@ def main():
             os.remove(os.path.join('previews', name))
 
     size = render(cams, ok, ext, now)
-    frames = build_archive(cams, ok if not args.no_download else {}, ext, now)
+    manifest = build_archive(cams, ok if not args.no_download else {}, ext, now)
+    frames = sum(len(v) for v in manifest.values())
+    videos = build_timelapse_videos(manifest) if not args.no_download else 0
     good = sum(1 for v in ok.values() if v)
-    print(f'OK {good}/{len(cams)}; формат {ext}; кадров в архиве {frames}; index.html {size // 1024} КБ')
+    print(f'OK {good}/{len(cams)}; формат {ext}; кадров в архиве {frames}; '
+          f'MP4 {videos}; index.html {size // 1024} КБ')
     if not args.no_download and good == 0:
         sys.exit(1)
 
