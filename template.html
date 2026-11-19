@@ -56,7 +56,7 @@ button[aria-pressed=true]{background:var(--chip-a);border-color:var(--acc);color
 .jk h2{position:sticky;top:58px;z-index:5;margin:0 0 10px;padding:4px 0;font-size:16px;line-height:1.25;
   background:var(--card);display:flex;align-items:baseline;gap:8px}
 .jk h2 .cnt{font-size:12px;font-weight:400;color:var(--mut)}
-.cams{display:grid;grid-template-columns:1fr;gap:8px;align-items:start}
+.cams{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;align-items:start}
 @media(min-width:560px){.cams{grid-template-columns:repeat(2,1fr)}}
 @media(min-width:900px){.cams{grid-template-columns:repeat(3,1fr)}}
 @media(min-width:1400px){.cams{grid-template-columns:repeat(4,1fr)}}
@@ -98,7 +98,20 @@ body.locked{overflow:hidden}
   font-size:18px;box-shadow:0 2px 10px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s}
 #top.show{opacity:1;pointer-events:auto}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+/* ---------- телефон: 1 или 2 камеры в ряд ---------- */
+.seg{display:none;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:6px 10px;font-size:13px;background:var(--card);color:var(--mut)}
+.seg button[aria-pressed=true]{background:var(--chip-a);color:var(--acc);font-weight:600}
+@media(max-width:559px){
+  .seg{display:flex}
+  html.one .cams{grid-template-columns:1fr}
+  .jk{padding:8px}
+  .cap{padding:6px 8px;gap:4px}
+  .cap .t{font-size:13px}
+  .cap .ts{display:none}
+}
 </style>
+<script>try{if(localStorage.getItem('camufa-cols')==='1')document.documentElement.className='one'}catch(e){}</script>
 </head>
 <body>
 <header>
@@ -111,6 +124,10 @@ body.locked{overflow:hidden}
       <input id="q" type="search" placeholder="Поиск по ЖК…" autocomplete="off" aria-label="Поиск по ЖК">
       <button id="fav" type="button" aria-pressed="false">★ Избранное</button>
       <button id="reload" type="button" title="Перезагрузить страницу" aria-label="Перезагрузить">⟳</button>
+      <div class="seg" id="cols" role="group" aria-label="Камер в строке">
+        <button type="button" data-n="1" aria-pressed="false">1</button>
+        <button type="button" data-n="2" aria-pressed="true">2</button>
+      </div>
     </div>
   </div>
 </header>
@@ -194,6 +211,20 @@ body.locked{overflow:hidden}
   });
 
   document.getElementById('reload').addEventListener('click', function(){ location.reload(); });
+
+  // 1 или 2 камеры в ряд на телефоне
+  var colsBtns = [].slice.call(document.querySelectorAll('#cols button'));
+  function setCols(n){
+    document.documentElement.classList.toggle('one', n === '1');
+    try { localStorage.setItem('camufa-cols', n); } catch(e){}
+    colsBtns.forEach(function(b){
+      b.setAttribute('aria-pressed', b.dataset.n === n ? 'true' : 'false');
+    });
+  }
+  colsBtns.forEach(function(b){
+    b.addEventListener('click', function(){ setCols(b.dataset.n); });
+  });
+  try { setCols(localStorage.getItem('camufa-cols') === '1' ? '1' : '2'); } catch(e){ setCols('2'); }
 
   window.addEventListener('scroll', function(){
     top.classList.toggle('show', window.scrollY > 600);
