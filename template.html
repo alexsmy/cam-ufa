@@ -92,6 +92,14 @@ button[aria-pressed=true]{background:var(--chip-a);border-color:var(--acc);color
 .tl-ctl{display:flex;align-items:center;gap:10px;padding:10px 12px}
 .tl-ctl input[type=range]{flex:1;accent-color:var(--acc)}
 .tl-ctl .t{font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums;min-width:78px;text-align:right}
+.tl-ctl #tl-gif{flex:none;min-width:116px;height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);
+  background:var(--card);color:var(--tx);font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer}
+.tl-ctl #tl-gif:disabled{opacity:.65;cursor:default}
+@media(max-width:559px){
+  .tl-ctl{flex-wrap:wrap}
+  .tl-ctl input[type=range]{min-width:140px}
+  .tl-ctl .t{min-width:auto}
+}
 body.locked{overflow:hidden}
 /* ---------- наверх ---------- */
 #top{position:fixed;right:14px;bottom:14px;width:42px;height:42px;border-radius:50%;padding:0;
@@ -148,6 +156,7 @@ body.locked{overflow:hidden}
       <button id="tl-play" type="button" aria-label="Пауза">⏸</button>
       <input id="tl-range" type="range" min="0" max="0" value="0" aria-label="Кадр">
       <span class="t" id="tl-time">—</span>
+      <button id="tl-gif" type="button" title="Скачать таймлапс в GIF">Скачать GIF</button>
     </div>
   </div>
 </div>
@@ -242,14 +251,34 @@ body.locked{overflow:hidden}
   }
   setInterval(tick, 60000);
 
-  // сохранить позицию при авто-перезагрузке
-  try {
-    var y = sessionStorage.getItem('camufa-y');
-    if (y) { window.scrollTo(0, +y); sessionStorage.removeItem('camufa-y'); }
-  } catch(e){}
-  window.addEventListener('beforeunload', function(){
-    try { sessionStorage.setItem('camufa-y', window.scrollY); } catch(e){}
-  });
+  // Позиция списка: сохраняем на каждом шаге прокрутки и возвращаем при
+  // возврате с просмотра камеры или после авто-обновления.
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  function saveY(){
+    try { sessionStorage.setItem('camufa-y', String(window.scrollY)); } catch(e){}
+  }
+  var saveTick = 0;
+  window.addEventListener('scroll', function(){
+    if (saveTick) return;
+    saveTick = requestAnimationFrame(function(){ saveTick = 0; saveY(); });
+  }, {passive:true});
+  window.addEventListener('pagehide', saveY);
+  window.addEventListener('beforeunload', saveY);
+
+  function restoreY(){
+    var y = 0;
+    try { y = +sessionStorage.getItem('camufa-y') || 0; } catch(e){}
+    if (y <= 0) return;
+    try { sessionStorage.removeItem('camufa-y'); } catch(e){}
+    var smooth = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = 'auto';
+    window.scrollTo(0, y);
+    document.documentElement.style.scrollBehavior = smooth;
+    // на случай, если картинки ещё изменили высоту
+    requestAnimationFrame(function(){ window.scrollTo(0, y); });
+  }
+  restoreY();
+  window.addEventListener('pageshow', function(e){ if (e.persisted) restoreY(); });
 
   // ---------- таймлапс за сутки ----------
   var ARCH_V = '{{ARCH_V}}';
@@ -260,10 +289,17 @@ body.locked{overflow:hidden}
   var tlRange = document.getElementById('tl-range');
   var tlTime = document.getElementById('tl-time');
   var tlPlay = document.getElementById('tl-play');
-  var frames = [], idx = 0, timer = null, manifest = null;
+  var tlGif = document.getElementById('tl-gif');
+  var frames = [], idx = 0, timer = null, manifest = null, tlId = '';
+  var gifBusy = false;
 
   function frameUrl(id, name){ return 'archive/' + id + '/' + name; }
   function label(name){ return name.slice(8, 10) + ':' + name.slice(10, 12); }
+
+  function gifLabel(text, busy){
+    tlGif.textContent = text;
+    tlGif.disabled = !!busy;
+  }
 
   function show(i){
     idx = i;
@@ -287,6 +323,7 @@ body.locked{overflow:hidden}
   }
 
   function openTL(id, name){
+    tlId = id;
     tlTitle.textContent = name + ' — таймлапс за сутки';
     tlEl.hidden = false;
     document.body.classList.add('locked');
@@ -294,6 +331,7 @@ body.locked{overflow:hidden}
     tlMsg.hidden = false;
     tlMsg.textContent = 'Загрузка кадров…';
     frames = [];
+    gifLabel('Скачать GIF', true);
     if (!manifest) {
       manifest = fetch('archive/index.json?v=' + ARCH_V)
         .then(function(r){ return r.ok ? r.json() : {}; })
@@ -303,9 +341,11 @@ body.locked{overflow:hidden}
       var list = m[id] || [];
       if (list.length < 2) {
         tlMsg.textContent = 'Кадры ещё накапливаются — загляните через час.';
+        gifLabel('Скачать GIF', true);
         return;
       }
       frames = list.map(function(n){ return {name:n, url: frameUrl(id, n)}; });
+      gifLabel('Скачать GIF', gifBusy);
       var loaded = 0;
       frames.forEach(function(f){
         var im = new Image();
@@ -319,6 +359,67 @@ body.locked{overflow:hidden}
       tlTime.textContent = label(frames[frames.length - 1].name);
     });
   }
+
+  // GIF собирается прямо в браузере: кадры уже лежат рядом с сайтом,
+  // поэтому ничего не нужно готовить на сервере.
+  function downloadGif(){
+    if (gifBusy || frames.length < 2) return;
+    gifBusy = true;
+    stop();
+    gifLabel('Готовлю… 0%', true);
+
+    var gifFrames = frames.slice();
+    var gifId = tlId;
+    var W = 384, H = 216;
+    var cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    var ctx = cv.getContext('2d', {willReadFrequently: true});
+
+    import('./gifenc.esm.js').then(function(mod){
+      var GIFEncoder = mod.GIFEncoder, quantize = mod.quantize, applyPalette = mod.applyPalette;
+      var enc = GIFEncoder();
+      var i = 0;
+
+      function step(){
+        if (i >= gifFrames.length) {
+          enc.finish();
+          var blob = new Blob([enc.bytes()], {type: 'image/gif'});
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'camufa-' + gifId + '-' + gifFrames[gifFrames.length - 1].name + '.gif';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+          gifBusy = false;
+          gifLabel('Скачать GIF', frames.length < 2);
+          tlMsg.hidden = true;
+          return;
+        }
+        var f = gifFrames[i];
+        var im = new Image();
+        im.onload = function(){
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, W, H);
+          ctx.drawImage(im, 0, 0, W, H);
+          var data = ctx.getImageData(0, 0, W, H).data;
+          var pal = quantize(data, 256);
+          enc.writeFrame(applyPalette(data, pal), W, H, {palette: pal, delay: 200});
+          i++;
+          gifLabel('Готовлю… ' + Math.round(i * 100 / gifFrames.length) + '%', true);
+          step();
+        };
+        im.onerror = function(){ i++; step(); };
+        im.src = f.url;
+      }
+      step();
+    }).catch(function(){
+      gifBusy = false;
+      gifLabel('Не вышло, ещё раз', false);
+    });
+  }
+  tlGif.addEventListener('click', downloadGif);
 
   cards.forEach(function(c){
     var b = c.querySelector('.tl-btn');

@@ -22,6 +22,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import quote
 
 MAX_MP4 = 2 * 1024 * 1024
 UA = 'Mozilla/5.0'
@@ -192,7 +193,8 @@ def render(cams, ok, ext, now):
         if jk != cur:
             flush()
             cur, buf = jk, []
-        stream = f'watch.html?id={cid}'
+        label = f'{jk} · {title}' if title and title != jk else (title or jk)
+        stream = f'watch.html?id={cid}&name={quote(label, safe="")}'
         src = f'previews/{cid}.{ext}?v={slot}'
         alt = html.escape(f'{jk}, {title}')
         search = html.escape(f'{jk} {title} {cid}'.lower(), quote=True)
@@ -205,17 +207,17 @@ def render(cams, ok, ext, now):
         else:
             badge = '<span class="badge">нет данных</span>'
         if has_img:
-            shot = (f'<a class="shot" href="{stream}" target="_blank" rel="noopener noreferrer">'
+            shot = (f'<a class="shot" href="{stream}">'
                     f'<img src="{src}" alt="{alt}" width="480" height="270" loading="lazy" decoding="async">'
                     f'{badge}</a>')
         else:
-            shot = (f'<a class="shot" href="{stream}" target="_blank" rel="noopener noreferrer">'
+            shot = (f'<a class="shot" href="{stream}">'
                     f'<div style="aspect-ratio:16/9;background:var(--line);border-radius:10px 10px 0 0"></div>'
                     f'{badge}</a>')
         buf.append(
             f'<article class="cam" data-id="{cid}" data-search="{search}">'
-            f'{shot}<div class="cap"><a class="t" href="{stream}" target="_blank" '
-            f'rel="noopener noreferrer">{html.escape(title)}</a>'
+            f'{shot}<div class="cap"><a class="t" href="{stream}">'
+            f'{html.escape(title)}</a>'
             f'<span class="ts">{ts}</span>'
             f'<button class="tl-btn" type="button" data-name="{alt}" title="Таймлапс за сутки" '
             f'aria-label="Таймлапс за сутки">⏱</button>'

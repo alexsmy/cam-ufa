@@ -2,134 +2,74 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta name="theme-color" content="#000">
+<meta name="theme-color" content="#0b0f14">
 <title>Камера</title>
 <style>
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:#000;overflow:hidden;font:16px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
-#stage{position:fixed;inset:0;overflow:hidden;touch-action:none}
-#frame{position:absolute;left:0;top:0;width:100%;height:100%;border:0;transform-origin:0 0;background:#000}
-#grab{position:absolute;inset:0;pointer-events:none}
-.bar{position:fixed;right:10px;bottom:14px;display:flex;gap:8px;z-index:10}
-.bar button{width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.25);
-  background:rgba(20,26,34,.72);color:#fff;font-size:20px;line-height:1;padding:0;
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-.bar button:active{background:rgba(40,52,68,.9)}
-#hint{position:fixed;left:0;right:0;bottom:70px;text-align:center;color:#cfe3ff;font-size:13px;
-  text-shadow:0 1px 4px #000;opacity:0;transition:opacity .25s;pointer-events:none;z-index:10}
-#hint.show{opacity:1}
-.top{position:fixed;left:10px;top:10px;z-index:10;display:flex;gap:8px;align-items:center}
-.top a,.top button{color:#fff;background:rgba(20,26,34,.72);border:1px solid rgba(255,255,255,.25);
-  border-radius:999px;padding:8px 12px;font-size:13px;text-decoration:none}
-@media(min-width:700px){.bar{right:18px;bottom:18px}}
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+body{display:flex;flex-direction:column;color:#e6edf3;
+  font:16px system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+#bar{flex:none;display:flex;align-items:center;gap:6px;
+  height:calc(54px + env(safe-area-inset-top));
+  padding:env(safe-area-inset-top) max(8px,env(safe-area-inset-right)) 0 max(8px,env(safe-area-inset-left));
+  background:#0b0f14;border-bottom:1px solid #1e2733}
+#bar .btn{flex:none;display:flex;align-items:center;justify-content:center;
+  width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:#e6edf3;
+  font:inherit;font-size:24px;line-height:1;text-decoration:none;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+#bar .btn:active{background:#1c2530}
+#bar .btn svg{display:block;width:22px;height:22px}
+#ttl{flex:1;min-width:0;padding:0 4px;text-align:center;font-size:15px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#stage{flex:1;position:relative;min-height:0;background:#000}
+#frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
 </style>
 </head>
 <body>
-<div id="stage">
-  <iframe id="frame" allow="autoplay; fullscreen; encrypted-media" allowfullscreen title="Видеотрансляция"></iframe>
-  <div id="grab"></div>
-</div>
-<div class="top">
-  <button id="close" type="button">← назад</button>
-  <a id="direct" href="#" target="_blank" rel="noopener noreferrer">оригинал</a>
-</div>
-<div class="bar">
-  <button id="out" type="button" aria-label="Уменьшить">−</button>
-  <button id="in" type="button" aria-label="Увеличить">+</button>
-  <button id="reset" type="button" aria-label="Сбросить масштаб">⟲</button>
-</div>
-<div id="hint">Двумя пальцами — масштаб, одним — перемещение</div>
+<header id="bar">
+  <button id="close" class="btn" type="button" aria-label="Назад к списку камер">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4l-8 8 8 8" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <div id="ttl">Камера</div>
+  <a id="direct" class="btn" href="#" target="_blank" rel="noopener noreferrer"
+     aria-label="Открыть оригинал в новой вкладке" title="Оригинал">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h10v10M18 6L6 18" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+</header>
+<main id="stage">
+  <iframe id="frame" allow="autoplay; fullscreen; encrypted-media" allowfullscreen
+          title="Видеотрансляция"></iframe>
+</main>
 <script>
 (function(){
   "use strict";
   var id = (new URLSearchParams(location.search)).get('id') || '';
+  var name = (new URLSearchParams(location.search)).get('name') || '';
   var src = 'https://ucams.ufanet.ru/api/internal/embed/' + encodeURIComponent(id) +
             '/?ttl=3600&autoplay=true&mute=true';
   var frame = document.getElementById('frame');
-  var grab = document.getElementById('grab');
-  var hint = document.getElementById('hint');
-  var stage = document.getElementById('stage');
+  var ttl = document.getElementById('ttl');
+
   frame.src = src;
   document.getElementById('direct').href = src;
+  if (name) {
+    ttl.textContent = name;
+    document.title = name + ' — камера';
+  }
+
+  // Возвращаемся в тот же список и на то же место. Список сам восстановит
+  // прокрутку (см. index.html), поэтому здесь достаточно поставить флаг.
   document.getElementById('close').addEventListener('click', function(){
-    if (history.length > 1) history.back(); else location.href = 'index.html';
+    try { sessionStorage.setItem('camufa-back', '1'); } catch(e){}
+    var same = false;
+    try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch(e){}
+    if (same && history.length > 1) history.back();
+    else location.replace('index.html');
   });
-
-  var k = 1, x = 0, y = 0, MAX = 5;
-  function clamp(){
-    var w = stage.clientWidth, h = stage.clientHeight;
-    var minX = w * (1 - k), minY = h * (1 - k);
-    if (x > 0) x = 0; if (x < minX) x = minX;
-    if (y > 0) y = 0; if (y < minY) y = minY;
-  }
-  function apply(){
-    clamp();
-    frame.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + k + ')';
-    grab.style.pointerEvents = k > 1 ? 'auto' : 'none';
-  }
-  function zoomAt(factor, cx, cy){
-    var nk = Math.min(MAX, Math.max(1, k * factor));
-    if (nk === k) return;
-    var px = (cx - x) / k, py = (cy - y) / k;
-    k = nk;
-    x = cx - px * k;
-    y = cy - py * k;
-    if (k === 1) { x = 0; y = 0; }
-    apply();
-  }
-  function showHint(){
-    hint.classList.add('show');
-    clearTimeout(showHint.t);
-    showHint.t = setTimeout(function(){ hint.classList.remove('show'); }, 2200);
-  }
-  document.getElementById('in').addEventListener('click', function(){
-    zoomAt(1.5, stage.clientWidth / 2, stage.clientHeight / 2); showHint();
-  });
-  document.getElementById('out').addEventListener('click', function(){
-    zoomAt(1 / 1.5, stage.clientWidth / 2, stage.clientHeight / 2);
-  });
-  document.getElementById('reset').addEventListener('click', function(){
-    k = 1; x = 0; y = 0; apply();
-  });
-
-  var pts = new Map(), startDist = 0, startK = 1, startX = 0, startY = 0, startMid = null;
-  function mid(){
-    var a = Array.from(pts.values());
-    return {x: (a[0].x + a[1].x) / 2, y: (a[0].y + a[1].y) / 2};
-  }
-  function dist(){
-    var a = Array.from(pts.values());
-    return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
-  }
-  grab.addEventListener('pointerdown', function(e){
-    grab.setPointerCapture(e.pointerId);
-    pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
-    if (pts.size === 1) { startX = x; startY = y; startMid = {x: e.clientX, y: e.clientY}; }
-    if (pts.size === 2) { startDist = dist(); startK = k; startMid = mid(); startX = x; startY = y; }
-  });
-  grab.addEventListener('pointermove', function(e){
-    if (!pts.has(e.pointerId)) return;
-    pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
-    if (pts.size === 1) {
-      x = startX + (e.clientX - startMid.x);
-      y = startY + (e.clientY - startMid.y);
-      apply();
-    } else if (pts.size === 2) {
-      var m = mid(), d = dist();
-      var nk = Math.min(MAX, Math.max(1, startK * d / startDist));
-      var px = (startMid.x - startX) / startK, py = (startMid.y - startY) / startK;
-      k = nk;
-      x = m.x - px * k;
-      y = m.y - py * k;
-      apply();
-    }
-  });
-  function up(e){ pts.delete(e.pointerId); if (pts.size === 1) { var a = Array.from(pts.values())[0]; startX = x; startY = y; startMid = {x: a.x, y: a.y}; } }
-  grab.addEventListener('pointerup', up);
-  grab.addEventListener('pointercancel', up);
-  apply();
 })();
 </script>
 </body>
