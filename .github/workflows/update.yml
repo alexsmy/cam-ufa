@@ -40,10 +40,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=github-pages&per_page=1" \
-                --jq '.artifacts[0].id // empty')
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=github-pages&per_page=100" \
+                --jq '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "main")]
+                      | sort_by(.created_at)
+                      | if length > 0 then .[-1].id else "" end')
           if [ -z "$id" ]; then
-            echo "Прошлой публикации нет — архив начнётся с этого запуска"
+            echo "Прошлой публикации main нет — архив начнётся с этого запуска"
             exit 0
           fi
           echo "Берём артефакт $id"
