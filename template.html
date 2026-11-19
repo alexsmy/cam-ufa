@@ -63,7 +63,25 @@ button[aria-pressed=true]{background:var(--chip-a);border-color:var(--acc);color
 .cap .ts{font-size:11px;color:var(--mut);white-space:nowrap}
 .star{border:0;background:none;padding:0 2px;font-size:17px;line-height:1;color:var(--mut)}
 .star[aria-pressed=true]{color:#e8a317}
+.tl-btn{border:0;background:none;padding:0 2px;font-size:14px;line-height:1;color:var(--mut)}
+.tl-btn:hover{color:var(--acc)}
 .empty{text-align:center;color:var(--mut);padding:40px 0}
+/* ---------- окно таймлапса ---------- */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.66);display:flex;align-items:center;
+  justify-content:center;padding:12px}
+.modal-box{background:var(--card);border-radius:12px;max-width:960px;width:100%;overflow:hidden;
+  box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;font-size:15px}
+.modal-hd strong{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal-hd button{border:0;background:none;font-size:24px;line-height:1;padding:0 6px;color:var(--mut)}
+.tl-stage{position:relative;background:#000;line-height:0;min-height:140px}
+.tl-stage img{width:100%;height:auto;display:block}
+.tl-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:14px;background:rgba(0,0,0,.6);padding:20px;text-align:center}
+.tl-ctl{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.tl-ctl input[type=range]{flex:1;accent-color:var(--acc)}
+.tl-ctl .t{font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums;min-width:78px;text-align:right}
+body.locked{overflow:hidden}
 /* ---------- наверх ---------- */
 #top{position:fixed;right:14px;bottom:14px;width:42px;height:42px;border-radius:50%;padding:0;
   font-size:18px;box-shadow:0 2px 10px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s}
@@ -90,6 +108,24 @@ button[aria-pressed=true]{background:var(--chip-a);border-color:var(--acc);color
 <p class="empty" id="empty" hidden>Ничего не найдено</p>
 </main>
 <button id="top" type="button" title="Наверх" aria-label="Наверх">↑</button>
+
+<div class="modal" id="tl" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="tl-title">
+    <div class="modal-hd">
+      <strong id="tl-title">Таймлапс</strong>
+      <button id="tl-close" type="button" aria-label="Закрыть">×</button>
+    </div>
+    <div class="tl-stage">
+      <img id="tl-img" alt="">
+      <div class="tl-msg" id="tl-msg">Загрузка кадров…</div>
+    </div>
+    <div class="tl-ctl">
+      <button id="tl-play" type="button" aria-label="Пауза">⏸</button>
+      <input id="tl-range" type="range" min="0" max="0" value="0" aria-label="Кадр">
+      <span class="t" id="tl-time">—</span>
+    </div>
+  </div>
+</div>
 <script>
 (function(){
   "use strict";
@@ -178,6 +214,89 @@ button[aria-pressed=true]{background:var(--chip-a);border-color:var(--acc);color
   window.addEventListener('beforeunload', function(){
     try { sessionStorage.setItem('camufa-y', window.scrollY); } catch(e){}
   });
+
+  // ---------- таймлапс за сутки ----------
+  var ARCH_V = '{{ARCH_V}}';
+  var tlEl = document.getElementById('tl');
+  var tlImg = document.getElementById('tl-img');
+  var tlMsg = document.getElementById('tl-msg');
+  var tlTitle = document.getElementById('tl-title');
+  var tlRange = document.getElementById('tl-range');
+  var tlTime = document.getElementById('tl-time');
+  var tlPlay = document.getElementById('tl-play');
+  var frames = [], idx = 0, timer = null, manifest = null;
+
+  function frameUrl(id, name){ return 'archive/' + id + '/' + name; }
+  function label(name){ return name.slice(8, 10) + ':' + name.slice(10, 12); }
+
+  function show(i){
+    idx = i;
+    tlImg.src = frames[i].url;
+    tlRange.value = i;
+    tlTime.textContent = label(frames[i].name);
+  }
+  function play(){
+    stop();
+    tlPlay.textContent = '⏸';
+    timer = setInterval(function(){ show((idx + 1) % frames.length); }, 250);
+  }
+  function stop(){
+    if (timer) { clearInterval(timer); timer = null; }
+    tlPlay.textContent = '▶';
+  }
+  function close(){
+    stop();
+    tlEl.hidden = true;
+    document.body.classList.remove('locked');
+  }
+
+  function openTL(id, name){
+    tlTitle.textContent = name + ' — таймлапс за сутки';
+    tlEl.hidden = false;
+    document.body.classList.add('locked');
+    tlImg.removeAttribute('src');
+    tlMsg.hidden = false;
+    tlMsg.textContent = 'Загрузка кадров…';
+    frames = [];
+    if (!manifest) {
+      manifest = fetch('archive/index.json?v=' + ARCH_V)
+        .then(function(r){ return r.ok ? r.json() : {}; })
+        .catch(function(){ return {}; });
+    }
+    manifest.then(function(m){
+      var list = m[id] || [];
+      if (list.length < 2) {
+        tlMsg.textContent = 'Кадры ещё накапливаются — загляните через час.';
+        return;
+      }
+      frames = list.map(function(n){ return {name:n, url: frameUrl(id, n)}; });
+      var loaded = 0;
+      frames.forEach(function(f){
+        var im = new Image();
+        im.onload = im.onerror = function(){
+          if (++loaded === 1) { tlMsg.hidden = true; show(frames.length - 1); play(); }
+        };
+        im.src = f.url;
+      });
+      tlRange.max = frames.length - 1;
+      tlRange.value = frames.length - 1;
+      tlTime.textContent = label(frames[frames.length - 1].name);
+    });
+  }
+
+  cards.forEach(function(c){
+    var b = c.querySelector('.tl-btn');
+    if (!b) return;
+    b.addEventListener('click', function(ev){
+      ev.preventDefault();
+      openTL(c.dataset.id, b.dataset.name || '');
+    });
+  });
+  document.getElementById('tl-close').addEventListener('click', close);
+  tlEl.addEventListener('click', function(e){ if (e.target === tlEl) close(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !tlEl.hidden) close(); });
+  tlPlay.addEventListener('click', function(){ timer ? stop() : play(); });
+  tlRange.addEventListener('input', function(){ stop(); show(+tlRange.value); });
 })();
 </script>
 </body>

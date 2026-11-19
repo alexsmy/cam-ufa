@@ -2,7 +2,7 @@ name: Обновление превью камер
 
 on:
   schedule:
-    - cron: '7 * * * *'      # каждый час в :07
+    - cron: '*/30 * * * *'   # каждые 30 минут: превью + кадр в архив
   workflow_dispatch:          # можно запустить вручную
 
 permissions:
@@ -38,6 +38,7 @@ jobs:
           mkdir -p _site
           cp index.html _site/
           cp -r previews _site/
+          cp -r archive _site/
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

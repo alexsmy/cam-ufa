@@ -28,6 +28,8 @@ UA = 'Mozilla/5.0'
 WORKERS = 4
 RETRIES = 2
 IMG_WIDTH = 480
+ARCHIVE = 'archive'
+KEEP_HOURS = 24
 
 try:
     import imageio_ffmpeg
@@ -126,6 +128,51 @@ def grab(cid, tmpdir, ext):
                     pass
 
 
+def build_archive(cams, ok, ext, now):
+    """Складывает свежие кадры в архив, чистит старше суток, пишет index.json."""
+    os.makedirs(ARCHIVE, exist_ok=True)
+    stamp = now.strftime('%Y%m%d%H%M')
+    cutoff = now - datetime.timedelta(hours=KEEP_HOURS)
+    manifest = {}
+
+    for c in cams:
+        cid = c['id']
+        src = os.path.join('previews', cid + '.' + ext)
+        folder = os.path.join(ARCHIVE, cid)
+        if ok.get(cid) and os.path.exists(src):
+            os.makedirs(folder, exist_ok=True)
+            shutil.copyfile(src, os.path.join(folder, stamp + '.' + ext))
+
+        keep = []
+        if os.path.isdir(folder):
+            for name in sorted(os.listdir(folder)):
+                stem, dot, fext = name.rpartition('.')
+                if not dot or fext not in ('webp', 'jpg'):
+                    continue
+                try:
+                    when = datetime.datetime.strptime(stem, '%Y%m%d%H%M').replace(tzinfo=TZ)
+                except ValueError:
+                    continue
+                if when >= cutoff:
+                    keep.append(name)
+                else:
+                    try:
+                        os.remove(os.path.join(folder, name))
+                    except OSError:
+                        pass
+        manifest[cid] = keep
+
+    # папки камер, которых больше нет
+    alive = {c['id'] for c in cams}
+    for name in os.listdir(ARCHIVE):
+        if os.path.isdir(os.path.join(ARCHIVE, name)) and name not in alive:
+            shutil.rmtree(os.path.join(ARCHIVE, name), ignore_errors=True)
+
+    with open(os.path.join(ARCHIVE, 'index.json'), 'w', encoding='utf-8') as f:
+        json.dump(manifest, f, ensure_ascii=False, separators=(',', ':'))
+    return sum(len(v) for v in manifest.values())
+
+
 def render(cams, ok, ext, now):
     stamp = now.strftime('%d.%m.%Y %H:%M')
     hour = now.strftime('%Y%m%d%H')
@@ -170,6 +217,8 @@ def render(cams, ok, ext, now):
             f'{shot}<div class="cap"><a class="t" href="{stream}" target="_blank" '
             f'rel="noopener noreferrer">{html.escape(title)}</a>'
             f'<span class="ts">{ts}</span>'
+            f'<button class="tl-btn" type="button" data-name="{alt}" title="Таймлапс за сутки" '
+            f'aria-label="Таймлапс за сутки">⏱</button>'
             f'<button class="star" type="button" aria-label="В избранное" aria-pressed="false">☆</button>'
             f'</div></article>')
     flush()
@@ -180,6 +229,7 @@ def render(cams, ok, ext, now):
                .replace('{{COUNT}}', str(len(cams)))
                .replace('{{ONLINE}}', str(sum(1 for v in ok.values() if v)))
                .replace('{{STAMP}}', stamp)
+               .replace('{{ARCH_V}}', hour)
                .replace('{{BUILT_MS}}', str(built)))
     with open('index.html', 'w', encoding='utf-8') as f:
         f.write(page)
@@ -226,8 +276,9 @@ def main():
             os.remove(os.path.join('previews', name))
 
     size = render(cams, ok, ext, now)
+    frames = build_archive(cams, ok if not args.no_download else {}, ext, now)
     good = sum(1 for v in ok.values() if v)
-    print(f'OK {good}/{len(cams)}; формат {ext}; index.html {size // 1024} КБ')
+    print(f'OK {good}/{len(cams)}; формат {ext}; кадров в архиве {frames}; index.html {size // 1024} КБ')
     if not args.no_download and good == 0:
         sys.exit(1)
 
