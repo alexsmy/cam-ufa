@@ -260,7 +260,7 @@ body.locked{overflow:hidden}
   var saveTick = 0;
   window.addEventListener('scroll', function(){
     if (saveTick) return;
-    saveTick = requestAnimationFrame(function(){ saveTick = 0; saveY(); });
+    saveTick = setTimeout(function(){ saveTick = 0; saveY(); }, 200);
   }, {passive:true});
   window.addEventListener('pagehide', saveY);
   window.addEventListener('beforeunload', saveY);
