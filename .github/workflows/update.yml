@@ -46,6 +46,7 @@ jobs:
             echo "Прошлой публикации нет — архив начнётся с этого запуска"
             exit 0
           fi
+          echo "Берём артефакт $id"
           if ! curl -sSL --fail --retry 3 \
                -H "Authorization: Bearer $GH_TOKEN" \
                -H "Accept: application/vnd.github+json" \
@@ -56,10 +57,16 @@ jobs:
           fi
           rm -rf /tmp/prev && mkdir -p /tmp/prev
           unzip -q /tmp/pages.zip -d /tmp/prev
+          # upload-pages-artifact кладёт сайт в один artifact.tar, а не файлами.
+          if [ -f /tmp/prev/artifact.tar ]; then
+            tar -xf /tmp/prev/artifact.tar -C /tmp/prev
+          fi
           if [ -d /tmp/prev/archive ]; then
             rm -rf ./archive
             cp -r /tmp/prev/archive ./archive
             echo "Кадров восстановлено: $(find archive -name '*.webp' | wc -l)"
+          else
+            echo "В прошлой публикации архива не было — начинаем с этого запуска"
           fi
 
       - name: Ставим ffmpeg через pip
