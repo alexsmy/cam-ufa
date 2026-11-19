@@ -124,7 +124,6 @@ body.locked{overflow:hidden}
     <div class="tools">
       <input id="q" type="search" placeholder="Поиск по ЖК…" autocomplete="off" aria-label="Поиск по ЖК">
       <button id="fav" type="button" aria-pressed="false">★<span class="lbl"> Избранное</span></button>
-      <button id="reload" type="button" title="Перезагрузить страницу" aria-label="Перезагрузить">⟳</button>
       <button id="cols" type="button" title="Камер в ряд" aria-label="Камер в ряд: 2">2</button>
     </div>
   </div>
@@ -207,8 +206,6 @@ body.locked{overflow:hidden}
     favBtn.setAttribute('aria-pressed', favOnly ? 'true' : 'false');
     apply();
   });
-
-  document.getElementById('reload').addEventListener('click', function(){ location.reload(); });
 
   // 1 или 2 камеры в ряд на телефоне (кнопка показывает текущий режим)
   var colsBtn = document.getElementById('cols');

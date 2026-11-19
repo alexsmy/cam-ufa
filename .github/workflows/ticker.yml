@@ -1,0 +1,54 @@
+name: Будильник обновлений
+
+# Зачем это нужно
+# ────────────────
+# GitHub не гарантирует запуск workflow по расписанию (cron): за 18 часов
+# расписание */30 не сработало ни разу, хотя workflow был активен.
+#
+# Поэтому обновление поддерживает себя само:
+#   update.yml  ──(после деплоя)──▶  ticker.yml
+#   ticker.yml  ──(через 24 мин)──▶  update.yml
+#   ... и так по кругу каждые ~30 минут.
+#
+# Запуск через workflow_dispatch работает всегда, потому что это исключение
+# из правила GitHub «события от GITHUB_TOKEN не создают новые запуски».
+#
+# Резерв: обычный cron в update.yml (:07 и :37) остаётся на случай, если
+# цепочка когда-нибудь оборвётся. Он просто перезапустит её.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+# Нужен только один будильник. Если пришёл новый — старый отменяется.
+concurrency:
+  group: ticker
+  cancel-in-progress: true
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Ждём и запускаем обновление
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Сборка занимает ~5–6 минут, поэтому ждём 24 минуты: итого ~30.
+          WAIT_SECONDS: '1440'
+        run: |
+          echo "Ждём ${WAIT_SECONDS} секунд"
+          sleep "$WAIT_SECONDS"
+
+          for i in 1 2 3; do
+            if gh workflow run update.yml --repo "$GITHUB_REPOSITORY" --ref main; then
+              echo "Обновление запущено"
+              exit 0
+            fi
+            echo "Попытка $i не удалась, повтор через 60 секунд"
+            sleep 60
+          done
+
+          echo "Не удалось запустить обновление" >&2
+          exit 1
