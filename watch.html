@@ -127,9 +127,10 @@ body.zoom #grab{display:block;pointer-events:auto}
     document.body.classList.toggle('zoom', on);
     zoomBtn.classList.toggle('on', on);
     zoomBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    zoomBtn.setAttribute('aria-label', on ? ('Масштаб ×' + k + '. Нажмите, чтобы изменить') : 'Приблизить');
+    var shown = Math.round(k * 10) / 10;
+    zoomBtn.setAttribute('aria-label', on ? ('Масштаб ×' + shown + '. Нажмите, чтобы изменить') : 'Приблизить');
     zlvl.hidden = !on;
-    zlvl.textContent = on ? ('×' + k) : '';
+    zlvl.textContent = on ? ('×' + shown) : '';
   }
   function apply(){
     clamp();
