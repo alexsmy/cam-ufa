@@ -62,9 +62,8 @@ body{display:flex;flex-direction:column;color:#e6edf3;
   }
 
   // Возвращаемся в тот же список и на то же место. Список сам восстановит
-  // прокрутку (см. index.html), поэтому здесь достаточно поставить флаг.
+  // прокрутку (см. index.html), поэтому здесь достаточно вернуться назад.
   document.getElementById('close').addEventListener('click', function(){
-    try { sessionStorage.setItem('camufa-back', '1'); } catch(e){}
     var same = false;
     try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch(e){}
     if (same && history.length > 1) history.back();

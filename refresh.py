@@ -194,7 +194,7 @@ def render(cams, ok, ext, now):
             flush()
             cur, buf = jk, []
         label = f'{jk} · {title}' if title and title != jk else (title or jk)
-        stream = f'watch.html?id={cid}&name={quote(label, safe="")}'
+        stream = f'watch.html?id={cid}&amp;name={quote(label, safe="")}'
         src = f'previews/{cid}.{ext}?v={slot}'
         alt = html.escape(f'{jk}, {title}')
         search = html.escape(f'{jk} {title} {cid}'.lower(), quote=True)

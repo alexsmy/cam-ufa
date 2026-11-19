@@ -255,7 +255,7 @@ body.locked{overflow:hidden}
   // возврате с просмотра камеры или после авто-обновления.
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
   function saveY(){
-    try { sessionStorage.setItem('camufa-y', String(window.scrollY)); } catch(e){}
+    try { sessionStorage.setItem('camufa-y', Math.round(window.scrollY) + '|' + Date.now()); } catch(e){}
   }
   var saveTick = 0;
   window.addEventListener('scroll', function(){
@@ -266,9 +266,13 @@ body.locked{overflow:hidden}
   window.addEventListener('beforeunload', saveY);
 
   function restoreY(){
-    var y = 0;
-    try { y = +sessionStorage.getItem('camufa-y') || 0; } catch(e){}
-    if (y <= 0) return;
+    var raw = '', y = 0, ts = 0;
+    try { raw = sessionStorage.getItem('camufa-y') || ''; } catch(e){}
+    var parts = raw.split('|');
+    y = +parts[0] || 0;
+    ts = +parts[1] || 0;
+    // возвращаем место только если уходили недавно (камера, авто-обновление)
+    if (y <= 0 || !ts || Date.now() - ts > 15 * 60000) return;
     try { sessionStorage.removeItem('camufa-y'); } catch(e){}
     var smooth = document.documentElement.style.scrollBehavior;
     document.documentElement.style.scrollBehavior = 'auto';
@@ -400,12 +404,18 @@ body.locked{overflow:hidden}
         var f = gifFrames[i];
         var im = new Image();
         im.onload = function(){
-          ctx.fillStyle = '#000';
-          ctx.fillRect(0, 0, W, H);
-          ctx.drawImage(im, 0, 0, W, H);
-          var data = ctx.getImageData(0, 0, W, H).data;
-          var pal = quantize(data, 256);
-          enc.writeFrame(applyPalette(data, pal), W, H, {palette: pal, delay: 200});
+          try {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, W, H);
+            ctx.drawImage(im, 0, 0, W, H);
+            var data = ctx.getImageData(0, 0, W, H).data;
+            var pal = quantize(data, 256);
+            enc.writeFrame(applyPalette(data, pal), W, H, {palette: pal, delay: 200});
+          } catch(e) {
+            gifBusy = false;
+            gifLabel('Не вышло, ещё раз', false);
+            return;
+          }
           i++;
           gifLabel('Готовлю… ' + Math.round(i * 100 / gifFrames.length) + '%', true);
           step();
