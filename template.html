@@ -97,6 +97,9 @@ button[aria-pressed=true]{background:var(--chip-a);border-color:var(--acc);color
   display:flex;align-items:center;justify-content:center;text-decoration:none}
 .tl-ctl #tl-mp4 svg{display:block;width:18px;height:18px}
 .tl-ctl #tl-mp4[aria-disabled=true]{color:var(--mut);opacity:.55;pointer-events:none}
+.tl-ctl #tl-speed{flex:none;height:34px;padding:0 6px;border-radius:8px;border:1px solid var(--line);
+  background:var(--card);color:var(--tx);font-size:13px;outline:none}
+.tl-ctl #tl-speed:focus{border-color:var(--acc)}
 @media(max-width:559px){
   .tl-ctl{flex-wrap:wrap}
   .tl-ctl input[type=range]{min-width:140px}
@@ -155,9 +158,18 @@ body.locked{overflow:hidden}
       <div class="tl-msg" id="tl-msg">Загрузка кадров…</div>
     </div>
     <div class="tl-ctl">
-      <button id="tl-play" type="button" aria-label="Пауза">⏸</button>
+      <button id="tl-play" type="button" aria-label="Воспроизвести">▶</button>
       <input id="tl-range" type="range" min="0" max="0" value="0" aria-label="Кадр">
       <span class="t" id="tl-time">—</span>
+      <select id="tl-speed" aria-label="Скорость воспроизведения" title="Кадров в секунду">
+        <option value="4">4 к/с</option>
+        <option value="5">5 к/с</option>
+        <option value="6" selected>6 к/с</option>
+        <option value="7">7 к/с</option>
+        <option value="8">8 к/с</option>
+        <option value="9">9 к/с</option>
+        <option value="10">10 к/с</option>
+      </select>
       <a id="tl-mp4" href="#" download aria-disabled="true" title="Скачать MP4" aria-label="Скачать MP4">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4-4m4 4l4-4M5 19h14"
           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -308,8 +320,10 @@ body.locked{overflow:hidden}
   var tlRange = document.getElementById('tl-range');
   var tlTime = document.getElementById('tl-time');
   var tlPlay = document.getElementById('tl-play');
+  var tlSpeed = document.getElementById('tl-speed');
   var tlMp4 = document.getElementById('tl-mp4');
   var frames = [], idx = 0, timer = null, manifest = null, tlId = '';
+  var speed = +tlSpeed.value || 6;
 
   function frameUrl(id, name){ return 'archive/' + id + '/' + name; }
   function label(name){ return name.slice(8, 10) + ':' + name.slice(10, 12); }
@@ -332,8 +346,13 @@ body.locked{overflow:hidden}
   }
   function play(){
     stop();
+    // один проход: с последнего кадра начинаем заново
+    if (idx >= frames.length - 1) show(0);
     tlPlay.textContent = '⏸';
-    timer = setInterval(function(){ show((idx + 1) % frames.length); }, 250);
+    timer = setInterval(function(){
+      if (idx >= frames.length - 1) { stop(); return; }
+      show(idx + 1);
+    }, 1000 / speed);
   }
   function stop(){
     if (timer) { clearInterval(timer); timer = null; }
@@ -377,7 +396,7 @@ body.locked{overflow:hidden}
       frames.forEach(function(f){
         var im = new Image();
         im.onload = im.onerror = function(){
-          if (++loaded === 1) { tlMsg.hidden = true; show(frames.length - 1); play(); }
+          if (++loaded === 1) { tlMsg.hidden = true; show(frames.length - 1); stop(); }
         };
         im.src = f.url;
       });
@@ -400,6 +419,11 @@ body.locked{overflow:hidden}
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !tlEl.hidden) close(); });
   tlPlay.addEventListener('click', function(){ timer ? stop() : play(); });
   tlRange.addEventListener('input', function(){ stop(); show(+tlRange.value); });
+  tlSpeed.addEventListener('change', function(){
+    var wasPlaying = !!timer;
+    speed = +tlSpeed.value || 6;
+    if (wasPlaying) play();
+  });
 })();
 </script>
 </body>

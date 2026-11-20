@@ -29,6 +29,7 @@ UA = 'Mozilla/5.0'
 WORKERS = 4
 RETRIES = 2
 IMG_WIDTH = 480
+VIDEO_FPS = 6          # кадров в секунду в экспортируемом MP4
 ARCHIVE = 'archive'
 KEEP_HOURS = 24
 
@@ -60,6 +61,78 @@ def detect_ext():
     except Exception:
         pass
     return 'jpg'
+
+
+def image_size(path):
+    """Быстро читаем размер WebP/JPEG/PNG, не ставя библиотеки."""
+    try:
+        with open(path, 'rb') as f:
+            data = f.read()
+    except OSError:
+        return None
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        chunk = data[12:16]
+        if chunk == b'VP8X':
+            return (1 + int.from_bytes(data[24:27], 'little'),
+                    1 + int.from_bytes(data[27:30], 'little'))
+        if chunk == b'VP8 ':
+            i = data.find(b'\x9d\x01\x2a', 16)
+            if i >= 0:
+                return (int.from_bytes(data[i + 3:i + 5], 'little') & 0x3fff,
+                        int.from_bytes(data[i + 5:i + 7], 'little') & 0x3fff)
+        if chunk == b'VP8L':
+            i = data.find(b'\x2f', 16)
+            if i >= 0:
+                b = int.from_bytes(data[i + 1:i + 5], 'little')
+                return ((b & 0x3fff) + 1, ((b >> 14) & 0x3fff) + 1)
+        return None
+    if data[:8] == b'\x89PNG\r\n\x1a\n':
+        return (int.from_bytes(data[16:20], 'big'), int.from_bytes(data[20:24], 'big'))
+    if data[:2] == b'\xff\xd8':
+        i = 2
+        while i + 9 < len(data):
+            if data[i] != 0xff:
+                i += 1
+                continue
+            marker = data[i + 1]
+            i += 2
+            if marker in (0xd8, 0xd9) or 0xd0 <= marker <= 0xd7:
+                continue
+            seglen = int.from_bytes(data[i:i + 2], 'big')
+            if marker in (0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7,
+                          0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf):
+                return (int.from_bytes(data[i + 3:i + 5], 'big'),
+                        int.from_bytes(data[i + 5:i + 7], 'big'))
+            i += seglen
+    return None
+
+
+def normalize_frame(path):
+    """Старые кадры меньшего размера подтягиваем до IMG_WIDTH."""
+    size = image_size(path)
+    if not size or size[0] == IMG_WIDTH:
+        return False
+    ext = path.rpartition('.')[2].lower()
+    # временный файл должен сохранить расширение, иначе ffmpeg не выберет формат
+    tmp = path + '.up.' + ext
+    cmd = [FFMPEG, '-y', '-nostdin', '-loglevel', 'error',
+           '-i', path, '-vf', f'scale={IMG_WIDTH}:-2']
+    if ext == 'jpg':
+        cmd += ['-q:v', '3']
+    else:
+        cmd += ['-c:v', 'libwebp', '-quality', '80', '-compression_level', '4']
+    cmd.append(tmp)
+    try:
+        r = subprocess.run(cmd, capture_output=True, timeout=60)
+        if r.returncode == 0 and os.path.exists(tmp) and os.path.getsize(tmp) > 1000:
+            os.replace(tmp, path)
+            return True
+    except (OSError, subprocess.SubprocessError):
+        pass
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    return False
 
 
 def get_token_and_host(cid):
@@ -135,6 +208,7 @@ def build_archive(cams, ok, ext, now):
     stamp = now.strftime('%Y%m%d%H%M')
     cutoff = now - datetime.timedelta(hours=KEEP_HOURS)
     manifest = {}
+    upscaled = 0
 
     for c in cams:
         cid = c['id']
@@ -161,6 +235,9 @@ def build_archive(cams, ok, ext, now):
                         os.remove(os.path.join(folder, name))
                     except OSError:
                         pass
+        for name in keep:
+            if normalize_frame(os.path.join(folder, name)):
+                upscaled += 1
         manifest[cid] = keep
 
     # папки камер, которых больше нет
@@ -171,6 +248,8 @@ def build_archive(cams, ok, ext, now):
 
     with open(os.path.join(ARCHIVE, 'index.json'), 'w', encoding='utf-8') as f:
         json.dump(manifest, f, ensure_ascii=False, separators=(',', ':'))
+    if upscaled:
+        print(f'Кадров увеличено до {IMG_WIDTH} px: {upscaled}')
     return manifest
 
 
@@ -191,13 +270,15 @@ def build_timelapse_videos(manifest):
             with open(lst, 'w', encoding='utf-8') as f:
                 # последний кадр дублируем, иначе concat может его «съесть»
                 for p in files + [files[-1]]:
-                    f.write("file '%s'\nduration 0.2\n" % os.path.abspath(p))
+                    f.write("file '%s'\nduration %.6f\n" %
+                            (os.path.abspath(p), 1.0 / VIDEO_FPS))
             tmp_out = os.path.join(tmpdir, cid + '.mp4')
             base = [
                 FFMPEG, '-y', '-nostdin', '-loglevel', 'error',
                 '-threads', '1', '-filter_threads', '1',
                 '-f', 'concat', '-safe', '0', '-i', lst,
-                '-vf', 'scale=480:-2,format=yuv420p', '-r', '5', '-an',
+                '-vf', f'scale={IMG_WIDTH}:-2,format=yuv420p',
+                '-r', str(VIDEO_FPS), '-an',
             ]
             tail = ['-crf', '26', '-pix_fmt', 'yuv420p',
                     '-movflags', '+faststart', tmp_out]
