@@ -74,8 +74,11 @@ button[aria-pressed=true]{background:var(--chip-a);border-color:var(--acc);color
 .cap .ts{font-size:11px;color:var(--mut);white-space:nowrap}
 .star{border:0;background:none;padding:0 2px;font-size:17px;line-height:1;color:var(--mut)}
 .star[aria-pressed=true]{color:#e8a317}
-.tl-btn{border:0;background:none;padding:0 2px;font-size:14px;line-height:1;color:var(--mut)}
-.tl-btn:hover{color:var(--acc)}
+.tl-btn{border:1px solid var(--chip-a);border-radius:8px;padding:3px 7px;font-size:14px;line-height:1;
+  color:var(--acc);background:linear-gradient(135deg,var(--chip),var(--chip-a));
+  box-shadow:0 1px 3px rgba(10,88,202,.18);transition:filter .15s,transform .1s}
+.tl-btn:hover{filter:brightness(.96)}
+.tl-btn:active{transform:scale(.94)}
 .empty{text-align:center;color:var(--mut);padding:40px 0}
 /* ---------- окно таймлапса ---------- */
 .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.66);display:flex;align-items:center;
@@ -396,7 +399,8 @@ body.locked{overflow:hidden}
       frames.forEach(function(f){
         var im = new Image();
         im.onload = im.onerror = function(){
-          if (++loaded === 1) { tlMsg.hidden = true; show(frames.length - 1); stop(); }
+          // автозапуск: с самого старого кадра до самого свежего, один проход
+          if (++loaded === 1) { tlMsg.hidden = true; show(0); play(); }
         };
         im.src = f.url;
       });
