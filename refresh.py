@@ -29,7 +29,9 @@ UA = 'Mozilla/5.0'
 WORKERS = 4
 RETRIES = 2
 IMG_WIDTH = 480
-VIDEO_FPS = 6          # кадров в секунду в экспортируемом MP4
+FRAME_STEP_MIN = 10    # как часто снимаем кадр
+VIDEO_FPS = 16         # кадров в секунду в MP4 и в плеере
+MAX_HOLD = 3           # старый кадр с шагом 30 минут показываем 3 раза
 ARCHIVE = 'archive'
 KEEP_HOURS = 24
 
@@ -135,6 +137,42 @@ def normalize_frame(path):
     return False
 
 
+def unique_count(frames):
+    """Сколько уникальных кадров (без повторов старых)."""
+    return sum(1 for i, name in enumerate(frames) if i == 0 or name != frames[i - 1])
+
+
+def expand_holds(names):
+    """Повторяет старые редкие кадры, чтобы таймлайн не ускорялся.
+
+    Новый архив снимается раз в 10 минут — такие кадры идут по одному.
+    Старые кадры шли раз в 24–30 минут: каждый повторяется 2–3 раза.
+    Файлы при этом не копируются, повторы живут только в index.json и MP4,
+    поэтому после удаления старых кадров из архива повторы исчезают сами.
+    """
+    if len(names) < 2:
+        return list(names)
+    times = []
+    for name in names:
+        try:
+            when = datetime.datetime.strptime(name.rpartition('.')[0], '%Y%m%d%H%M')
+            times.append(when.replace(tzinfo=TZ))
+        except ValueError:
+            times.append(None)
+    out = []
+    for i, name in enumerate(names):
+        hold = 1
+        nxt = times[i + 1] if i + 1 < len(names) else None
+        if times[i] and nxt:
+            gap = (nxt - times[i]).total_seconds() / 60
+            if gap > 2.3 * FRAME_STEP_MIN:      # ~24–30 минут
+                hold = MAX_HOLD
+            elif gap > 1.4 * FRAME_STEP_MIN:    # ~15–23 минуты
+                hold = 2
+        out.extend([name] * hold)
+    return out
+
+
 def get_token_and_host(cid):
     url = f'https://ucams.ufanet.ru/api/internal/embed/{cid}/?ttl=3600&autoplay=true&mute=true'
     req = urllib.request.Request(url, headers={'User-Agent': UA})
@@ -238,7 +276,7 @@ def build_archive(cams, ok, ext, now):
         for name in keep:
             if normalize_frame(os.path.join(folder, name)):
                 upscaled += 1
-        manifest[cid] = keep
+        manifest[cid] = expand_holds(keep)
 
     # папки камер, которых больше нет
     alive = {c['id'] for c in cams}
@@ -261,7 +299,7 @@ def build_timelapse_videos(manifest):
         for cid, frames in manifest.items():
             folder = os.path.join(ARCHIVE, cid)
             out = os.path.join(folder, 'timelapse.mp4')
-            if len(frames) < 2:
+            if unique_count(frames) < 2:
                 if os.path.exists(out):
                     os.remove(out)
                 continue
@@ -302,7 +340,7 @@ def build_timelapse_videos(manifest):
 
 def render(cams, ok, ext, now):
     stamp = now.strftime('%d.%m.%Y %H:%M')
-    slot = now.strftime('%Y%m%d') + ('00' if now.minute < 30 else '30')
+    slot = now.strftime('%Y%m%d%H') + '%02d' % (now.minute // 10 * 10)
     sections, cur, buf = [], None, []
 
     def flush():
@@ -406,9 +444,11 @@ def main():
     size = render(cams, ok, ext, now)
     manifest = build_archive(cams, ok if not args.no_download else {}, ext, now)
     frames = sum(len(v) for v in manifest.values())
+    unique = sum(unique_count(v) for v in manifest.values())
     videos = build_timelapse_videos(manifest) if not args.no_download else 0
     good = sum(1 for v in ok.values() if v)
-    print(f'OK {good}/{len(cams)}; формат {ext}; кадров в архиве {frames}; '
+    extra = f' ({frames} с повторами старых)' if frames != unique else ''
+    print(f'OK {good}/{len(cams)}; формат {ext}; кадров в архиве {unique}{extra}; '
           f'MP4 {videos}; index.html {size // 1024} КБ')
     if not args.no_download and good == 0:
         sys.exit(1)

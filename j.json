@@ -1,0 +1,49 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 136772065154,
+      "run_id": 44879701025,
+      "workflow_name": "Будильник обновлений",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/alexsmy/cam-ufa/actions/runs/44879701025",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVzWl7c8AAAAf2EAXgg",
+      "head_sha": "35a83de8988e329eb3964583b8b1aba86757ea56",
+      "url": "https://api.github.com/repos/alexsmy/cam-ufa/actions/jobs/136772065154",
+      "html_url": "https://github.com/alexsmy/cam-ufa/actions/runs/44879701025/job/136772065154",
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-11-21T07:19:24Z",
+      "started_at": "2026-11-21T07:19:26Z",
+      "completed_at": null,
+      "name": "tick",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-21T07:19:26Z",
+          "completed_at": "2026-11-21T07:19:26Z"
+        },
+        {
+          "name": "Ждём и запускаем обновление",
+          "status": "in_progress",
+          "conclusion": null,
+          "number": 2,
+          "started_at": "2026-11-21T07:19:26Z",
+          "completed_at": null
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/alexsmy/cam-ufa/check-runs/136772065154",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000660,
+      "runner_name": "GitHub Actions 1000000660",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

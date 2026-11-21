@@ -9,11 +9,11 @@
 <meta name="theme-color" content="#0f1419" media="(prefers-color-scheme: dark)">
 <title>Камеры строек Уфы</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<meta name="description" content="Камеры строек и ЖК Уфы: превью обновляются каждые 30 минут, таймлапс за сутки.">
+<meta name="description" content="Камеры строек и ЖК Уфы: превью обновляются каждые 10 минут, таймлапс за сутки.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Камеры строек Уфы">
 <meta property="og:title" content="Камеры строек Уфы">
-<meta property="og:description" content="72 камеры строек и ЖК Уфы. Превью обновляются каждые 30 минут, таймлапс за сутки.">
+<meta property="og:description" content="72 камеры строек и ЖК Уфы. Превью обновляются каждые 10 минут, таймлапс за сутки.">
 <meta property="og:url" content="https://alexsmy.github.io/cam-ufa/">
 <meta property="og:image" content="https://alexsmy.github.io/cam-ufa/og.png">
 <meta property="og:image:width" content="1200">
@@ -166,12 +166,12 @@ body.locked{overflow:hidden}
       <span class="t" id="tl-time">—</span>
       <select id="tl-speed" aria-label="Скорость воспроизведения" title="Кадров в секунду">
         <option value="4">4 к/с</option>
-        <option value="5">5 к/с</option>
-        <option value="6" selected>6 к/с</option>
-        <option value="7">7 к/с</option>
+        <option value="6">6 к/с</option>
         <option value="8">8 к/с</option>
-        <option value="9">9 к/с</option>
         <option value="10">10 к/с</option>
+        <option value="12">12 к/с</option>
+        <option value="14">14 к/с</option>
+        <option value="16" selected>16 к/с</option>
       </select>
       <a id="tl-mp4" href="#" download aria-disabled="true" title="Скачать MP4" aria-label="Скачать MP4">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0l-4-4m4 4l4-4M5 19h14"
@@ -265,7 +265,10 @@ body.locked{overflow:hidden}
       'обновлено ' + (m < 60 ? m + ' мин назад' : Math.floor(m/60) + ' ч назад'));
     var last = 0;
     try { last = +sessionStorage.getItem('camufa-reload') || 0; } catch(e){}
-    if (age > 35 * 60000 && Date.now() - last > 10 * 60000) {
+    // не перезагружаем, пока открыт таймлапс — иначе проигрывание оборвётся
+    var tl = document.getElementById('tl');
+    if (tl && !tl.hidden) return;
+    if (age > 11 * 60000 && Date.now() - last > 10 * 60000) {
       try { sessionStorage.setItem('camufa-reload', String(Date.now())); } catch(e){}
       try { sessionStorage.setItem('camufa-return', '1'); } catch(e){}
       location.reload();
@@ -326,7 +329,7 @@ body.locked{overflow:hidden}
   var tlSpeed = document.getElementById('tl-speed');
   var tlMp4 = document.getElementById('tl-mp4');
   var frames = [], idx = 0, timer = null, manifest = null, tlId = '';
-  var speed = +tlSpeed.value || 6;
+  var speed = +tlSpeed.value || 16;
 
   function frameUrl(id, name){ return 'archive/' + id + '/' + name; }
   function label(name){ return name.slice(8, 10) + ':' + name.slice(10, 12); }
@@ -396,7 +399,11 @@ body.locked{overflow:hidden}
       frames = list.map(function(n){ return {name:n, url: frameUrl(id, n)}; });
       setDownload((m.vids || []).indexOf(id) >= 0);
       var loaded = 0;
+      var seen = {};
       frames.forEach(function(f){
+        // повторы старых кадров ссылаются на тот же файл — грузим его один раз
+        if (seen[f.url]) return;
+        seen[f.url] = 1;
         var im = new Image();
         im.onload = im.onerror = function(){
           // автозапуск: с самого старого кадра до самого свежего, один проход
