@@ -92,7 +92,11 @@ button[aria-pressed=true]{background:var(--chip-a);border-color:var(--acc);color
 .tl-stage img{width:100%;height:auto;display:block}
 .tl-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   color:#fff;font-size:14px;background:rgba(0,0,0,.6);padding:20px;text-align:center}
+.tl-prog{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.22)}
+.tl-prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .18s linear}
+.tl-prog[hidden]{display:none}
 .tl-ctl{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.tl-ctl button:disabled{opacity:.45;cursor:default}
 .tl-ctl input[type=range]{flex:1;accent-color:var(--acc)}
 .tl-ctl .t{font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums;min-width:78px;text-align:right}
 .tl-ctl #tl-mp4{flex:none;width:34px;height:34px;padding:0;border-radius:8px;
@@ -158,7 +162,8 @@ body.locked{overflow:hidden}
     </div>
     <div class="tl-stage">
       <img id="tl-img" alt="">
-      <div class="tl-msg" id="tl-msg">Загрузка кадров…</div>
+      <div class="tl-msg" id="tl-msg">Загрузка архива…</div>
+      <div class="tl-prog" id="tl-prog" hidden><i></i></div>
     </div>
     <div class="tl-ctl">
       <button id="tl-play" type="button" aria-label="Воспроизвести">▶</button>
@@ -328,11 +333,19 @@ body.locked{overflow:hidden}
   var tlPlay = document.getElementById('tl-play');
   var tlSpeed = document.getElementById('tl-speed');
   var tlMp4 = document.getElementById('tl-mp4');
+  var tlProg = document.getElementById('tl-prog');
+  var tlProgBar = tlProg.querySelector('i');
   var frames = [], idx = 0, timer = null, manifest = null, tlId = '';
   var speed = +tlSpeed.value || 16;
+  var loadedMap = {}, tlSession = 0;
 
   function frameUrl(id, name){ return 'archive/' + id + '/' + name; }
   function label(name){ return name.slice(8, 10) + ':' + name.slice(10, 12); }
+  function setProgress(part){
+    tlProg.hidden = false;
+    tlProgBar.style.width = Math.max(0, Math.min(100, Math.round(part * 100))) + '%';
+  }
+  function hideProgress(){ tlProg.hidden = true; }
 
   function setDownload(enabled){
     if (enabled) {
@@ -357,6 +370,9 @@ body.locked{overflow:hidden}
     tlPlay.textContent = '⏸';
     timer = setInterval(function(){
       if (idx >= frames.length - 1) { stop(); return; }
+      var next = frames[idx + 1];
+      // если следующий кадр ещё грузится — придерживаем текущий, не перескакиваем
+      if (!loadedMap[next.url]) return;
       show(idx + 1);
     }, 1000 / speed);
   }
@@ -366,18 +382,25 @@ body.locked{overflow:hidden}
   }
   function close(){
     stop();
+    tlSession++;
+    hideProgress();
     tlEl.hidden = true;
     document.body.classList.remove('locked');
   }
 
   function openTL(id, name){
+    stop();
     tlId = id;
+    var my = ++tlSession;
+    loadedMap = {};
+    tlPlay.disabled = true;
     tlTitle.textContent = name + ' — таймлапс за сутки';
     tlEl.hidden = false;
     document.body.classList.add('locked');
     tlImg.removeAttribute('src');
     tlMsg.hidden = false;
-    tlMsg.textContent = 'Загрузка кадров…';
+    tlMsg.textContent = 'Загрузка архива… 0%';
+    setProgress(0);
     frames = [];
     setDownload(false);
     if (!manifest) {
@@ -391,29 +414,71 @@ body.locked{overflow:hidden}
       ]).then(function(a){ return {list: a[0], vids: a[1]}; });
     }
     manifest.then(function(m){
+      if (my !== tlSession) return;
       var list = m.list[id] || [];
       if (list.length < 2) {
         tlMsg.textContent = 'Кадры ещё накапливаются — загляните через час.';
+        hideProgress();
         return;
       }
       frames = list.map(function(n){ return {name:n, url: frameUrl(id, n)}; });
       setDownload((m.vids || []).indexOf(id) >= 0);
-      var loaded = 0;
-      var seen = {};
-      frames.forEach(function(f){
-        // повторы старых кадров ссылаются на тот же файл — грузим его один раз
-        if (seen[f.url]) return;
-        seen[f.url] = 1;
-        var im = new Image();
-        im.onload = im.onerror = function(){
-          // автозапуск: с самого старого кадра до самого свежего, один проход
-          if (++loaded === 1) { tlMsg.hidden = true; show(0); play(); }
-        };
-        im.src = f.url;
-      });
       tlRange.max = frames.length - 1;
       tlRange.value = frames.length - 1;
       tlTime.textContent = label(frames[frames.length - 1].name);
+
+      // грузим каждый уникальный кадр один раз: повторам старых кадров
+      // соответствует тот же файл, поэтому они не удваивают загрузку
+      var urls = [], seen = {};
+      frames.forEach(function(f){
+        if (seen[f.url]) return;
+        seen[f.url] = 1;
+        urls.push(f.url);
+      });
+      var total = urls.length, loaded = 0, started = false, keep = [];
+
+      function begin(message){
+        if (started || my !== tlSession) return;
+        started = true;
+        if (message) tlMsg.textContent = message;
+        hideProgress();
+        tlMsg.hidden = true;
+        tlPlay.disabled = false;
+        show(0);
+        play();
+      }
+      function note(url, ok){
+        if (my !== tlSession) return;
+        loadedMap[url] = ok ? 1 : 2;
+        loaded++;
+        if (!started) {
+          var part = loaded / total;
+          tlMsg.textContent = 'Загрузка архива… ' + Math.round(part * 100) + '%';
+          setProgress(part);
+          // стартуем, когда загружено больше половины: остальное догрузится
+          // за первые секунды просмотра
+          if (loaded * 2 > total && loadedMap[frames[0].url]) begin();
+        }
+      }
+      urls.forEach(function(url){
+        var im = new Image(), tries = 0;
+        keep.push(im);
+        function load(){
+          im.onload = function(){ note(url, true); };
+          im.onerror = function(){
+            if (tries < 2) {
+              tries++;
+              setTimeout(function(){ im.src = url + '?r=' + tries; }, 300 * tries);
+            } else {
+              note(url, false);
+            }
+          };
+          im.src = url;
+        }
+        load();
+      });
+      // страховка: не держим окно пустым дольше 15 секунд
+      setTimeout(function(){ if (!started) begin('Загрузка медленная — начинаем…'); }, 15000);
     });
   }
 
